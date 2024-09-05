@@ -1,36 +1,34 @@
 import sys
 from dotenv import load_dotenv, find_dotenv
 
-import requests
-
 from PyQt5.QtGui import QGuiApplication
 from PyQt5.QtQml import QQmlApplicationEngine
-from PyQt5.QtCore import QStringListModel, QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal
 
-
-def get_countries():
-    url = "http://country.io/names.json"
-    response = requests.get(url)
-    data = response.json()
-    
-    #Format and sort the data
-    data_list = list(data.values())
-    return sorted(data_list)
+from  src.api_connector import ApiConnector
 
 
 class Backend(QObject):
-    deviceListSet = pyqtSignal(str)
-    deviceListUpdated = pyqtSignal(list, arguments=["devices"])
+    requestLocationList = pyqtSignal(str, arguments=["env"])
+    locationListUpdated = pyqtSignal(list, arguments=["locations"])
 
     def __init__(self):
         super().__init__()
-        self.deviceListSet.connect(self.update_devices_list)
-        self.deviceListUpdated.emit(get_countries())
+        self.locations_by_env = dict()
+        self.requestLocationList.connect(self.update_locations_list)
 
-    def update_devices_list(self, env):
-        devicesListModel = get_countries()  # TODO: replace with get_devices()
-        devicesListModel.append(env)
-        self.deviceListUpdated.emit(devicesListModel)
+    def update_locations_list(self, env):
+        locations = []
+        if env in self.locations_by_env:
+            locations = self.locations_by_env[env]
+        else:
+            locations = ApiConnector(env).get_prod_locations()
+            if not locations:
+                locations = ["No available location"]
+
+        self.locations_by_env[env] = locations
+
+        self.locationListUpdated.emit(locations)
 
 
 def main():
